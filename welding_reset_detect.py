@@ -1,11 +1,10 @@
 import cv2
 import torch
-from shapely.geometry import box, Polygon
 
 from datetime import datetime
 from ultralytics import YOLO
-
-from config import VIDEOS_WELDING,WEIGHTS_WELDING_RESET,SAVE_IMG_PATH_WELDING_K2,URL_IMG_PATH_WELDING_K2,WELDING_REGION
+from utils import IoU_polygon
+from config import VIDEOS_WELDING,WEIGHTS_WELDING_RESET,SAVE_IMG_PATH_WELDING_K2,URL_IMG_PATH_WELDING_K2,WELDING_REGION1,WELDING_REGION2
 import logging
 from uvicorn.config import LOGGING_CONFIG
 
@@ -81,20 +80,13 @@ def process_video(model_path, video_source, start_event, stop_event,welding_rese
                 if model_path == WEIGHTS_WELDING_RESET[2]:
                     welding_reset_flag[3]=False
                     if label=='weilding_componet':#检查焊件
-                        welding_reset_flag[3]=True
+                        if IoU_polygon(boxes[i].tolist(), polygon_points=WELDING_REGION2.tolist())>0.1:
+                            welding_reset_flag[3]=True
                     if label=="grounding_wire" :
-                        rect_shapely = box(x1,y1, x2, y2)#使用shapely库创建的矩形
-                        WELDING_REGION3_shapely = Polygon(WELDING_REGION.tolist()) #shapely计算矩形检测框和多边形的iou使用
-                        intersection = rect_shapely.intersection(WELDING_REGION3_shapely)
-                                # 计算并集
-                        union = rect_shapely.union(WELDING_REGION3_shapely)
-                                # 计算 IoU
-                        iou = intersection.area / union.area
-
-                        if iou>0 :
-                            welding_reset_flag[2]=True #表示搭铁线连接在焊台上
+                        if IoU_polygon(boxes[i].tolist(), polygon_points=WELDING_REGION1.tolist())>0.1:
+                            welding_reset_flag[2]=True
                         else:
-                            welding_reset_flag[2]=False #表示未连接上
+                            welding_reset_flag[2]=False
 
 
                 if model_path == WEIGHTS_WELDING_RESET[0]:

@@ -41,4 +41,5 @@ WEIGHTS_WELDING_EXAM=[
     WEIGHTS_WELDING_DESK_CLS
 ]
 
-WELDING_REGION = np.array([[1613, 627], [1601, 658], [1697, 987], [1710, 962]], np.int32)
+WELDING_REGION1 = np.array([[462, 279], [566, 914], [763, 1008], [639, 213]], np.int32)#搭铁线的识别区域
+WELDING_REGION2 = np.array([[650, 220], [770, 1005], [1462, 720], [1420, 181]], np.int32)#放置焊件的识别区域

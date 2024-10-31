@@ -6,8 +6,9 @@ import logging
 from fastapi.staticfiles import StaticFiles
 import multiprocessing as mp
 from welding_reset_detect import process_video as process_video_reset
-from welding_reset_detect import video_decoder 
-#from welding_exam_detect import process_video as process_video_exam
+from welding_reset_detect import video_decoder as video_decoder_reset
+from welding_exam_detect import video_decoder as video_decoder_exam
+from welding_exam_detect import process_video as process_video_exam
 from config import VIDEOS_WELDING,WEIGHTS_WELDING_RESET,WEIGHTS_WELDING_EXAM
 from multiprocessing import Queue
 
@@ -67,7 +68,7 @@ def reset_detection():#发送开启AI服务时，检测复位
         for video_source in VIDEOS_WELDING:
             start_event = mp.Event()  # 为每个进程创建一个独立的事件
             start_events.append(start_event)  # 加入 start_events 列表
-            process = mp.Process(target=video_decoder, args=(video_source,welding_reset_frame_queue_list, start_event, stop_event))
+            process = mp.Process(target=video_decoder_reset, args=(video_source,welding_reset_frame_queue_list, start_event, stop_event))
             processes.append(process)
             process.start()
             logging.info(f"{video_source} Loading video stream success✅")
@@ -114,6 +115,71 @@ def reset_status():#获取复位检测状态
 
         reset_shared_variables()
         return {"status": "NOT_RESET_ALL","data":json_array}
+
+
+@app.get('/welding_detection')
+def welding_detection():#开始登录时，检测是否需要复位，若需要，则发送复位信息，否则开始焊接检测
+
+    if not any(p.is_alive() for p in processes):  # 防止重复开启检测服务
+        stop_event.clear()
+
+        start_events = []  # 存储每个进程的启动事件
+
+        for video_source in VIDEOS_WELDING:
+            start_event = mp.Event()  # 为每个进程创建一个独立的事件
+            start_events.append(start_event)  # 加入 start_events 列表
+            process = mp.Process(target=video_decoder_exam, args=(video_source,welding_exam_frame_queue_list, start_event, stop_event))
+            processes.append(process)
+            process.start()
+            logging.info("Loading video stream success✅")
+
+        for model_path, video_source in zip(WEIGHTS_WELDING_EXAM, welding_exam_frame_queue_list):
+            start_event = mp.Event()  # 为每个进程创建一个独立的事件
+            start_events.append(start_event)  # 加入 start_events 列表
+
+            process = mp.Process(target=process_video_exam, args=(model_path,video_source, start_event, stop_event, welding_exam_flag, welding_exam_imgs,welding_exam_order))
+            processes.append(process)
+            process.start()
+            logging.info("welding exam detection process is running🚀")
+
+        logging.info('start_welding_exam_detection')
+        reset_shared_variables()
+
+        # 等待所有进程的 start_event 被 set
+        for event in start_events:
+            event.wait()  # 等待每个进程通知它已经成功启动
+
+        return {"status": "SUCCESS"}
+
+    else:
+        logging.info("welding_exam_detection")
+        return {"status": "ALREADY_RUNNING"}
+            
+@app.get('/welding_status')
+def welding_status():#开始登录时，检测是否需要复位，若需要，则发送复位信息，否则开始焊接检测
+
+    
+    if len(welding_exam_order)==0:#表示还没有检测到任何一个焊接步骤
+        logging.info('welding_exam_order is none')
+        return {"status": "NONE"}
+
+    else:
+
+
+        json_array = []
+        for value in welding_exam_order:
+            match = re.search(r'welding_exam_(\d+)', value)
+            step_number = match.group(1)
+            json_object = {"step": step_number, "image": welding_exam_imgs.get(f"welding_exam_{step_number}")}
+            json_array.append(json_object)
+        return {"status": "SUCCESS","data":json_array}
+
+@app.get('/end_welding_exam')
+def end_welding_exam():
+    stop_inference_internal()
+    time.sleep(1)
+    return reset_detection()
+
 
     
 #停止多进程函数的写法
