@@ -20,7 +20,7 @@ def video_decoder(rtsp_url, frame_queue_list,start_event, stop_event):
         ret, frame = cap.read()
         if not ret:
             break
-        if cap.get(cv2.CAP_PROP_POS_FRAMES) % 25 != 0:
+        if cap.get(cv2.CAP_PROP_POS_FRAMES) % 10 != 0:
             continue
         if rtsp_url==VIDEOS_WELDING[0]:
             frame_queue_list[0].put_nowait(frame)
