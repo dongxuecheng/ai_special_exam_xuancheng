@@ -19,7 +19,7 @@ def video_decoder(rtsp_url, frame_queue_list,start_event, stop_event):
         ret, frame = cap.read()
         if not ret:
             break
-        if cap.get(cv2.CAP_PROP_POS_FRAMES) % 25 != 0:
+        if cap.get(cv2.CAP_PROP_POS_FRAMES) % 10 != 0:
             continue
         if rtsp_url==VIDEOS_WELDING[0]:
             frame_queue_list[0].put_nowait(frame)
@@ -54,12 +54,14 @@ def process_video(model_path, video_source, start_event, stop_event,welding_rese
         frame = video_source.get()
         results = model.predict(frame,verbose=False,conf=0.4)
         for r in results:
-            boxes = r.boxes.xyxy  # 提取所有检测到的边界框坐标
-            confidences = r.boxes.conf  # 提取所有检测到的置信度
-            classes = r.boxes.cls  # 提取所有检测到的类别索引
+            boxes = r.boxes.xyxy  
+            confidences = r.boxes.conf  
+            classes = r.boxes.cls  
+
+            if model_path == WEIGHTS_WELDING_RESET[1]:
+                welding_reset_flag[0] = True#油桶需要特殊处理
+
             for i in range(len(boxes)):
-                x1, y1, x2, y2 = boxes[i].tolist()
-                confidence = confidences[i].item()
                 cls = int(classes[i].item())
                 label = model.names[cls]
                 if model_path == WEIGHTS_WELDING_RESET[0]:
@@ -69,7 +71,8 @@ def process_video(model_path, video_source, start_event, stop_event,welding_rese
                         welding_reset_flag[4] = False
 
                 if model_path == WEIGHTS_WELDING_RESET[1]:
-                    welding_reset_flag[0]=True#油桶默认没检测到时，就说明是安全的
+
+
                     if label=='oil_tank':#检测油桶,就说明油桶在危险区域
                         welding_reset_flag[0]=False
                     if label=='main_switch_open':
@@ -78,7 +81,7 @@ def process_video(model_path, video_source, start_event, stop_event,welding_rese
                         welding_reset_flag[1]=False
 
                 if model_path == WEIGHTS_WELDING_RESET[2]:
-                    welding_reset_flag[3]=False
+
                     if label=='weilding_componet':#检查焊件
                         if IoU_polygon(boxes[i].tolist(), polygon_points=WELDING_REGION2.tolist())>0.1:
                             welding_reset_flag[3]=True
@@ -89,25 +92,27 @@ def process_video(model_path, video_source, start_event, stop_event,welding_rese
                             welding_reset_flag[2]=False
 
 
-                if model_path == WEIGHTS_WELDING_RESET[0]:
-                    if welding_reset_flag[4] and 'reset_step_5' not in welding_reset_imgs:
-                        logging.info("welding machine switch is not reset")
-                        save_image(welding_reset_imgs,results, "reset_step_5")
+            if model_path == WEIGHTS_WELDING_RESET[0]:
+                if welding_reset_flag[4] and 'reset_step_5' not in welding_reset_imgs:
+                    logging.info("welding machine switch is not reset")
+                    save_image(welding_reset_imgs,results, "reset_step_5")
 
-                if model_path == WEIGHTS_WELDING_RESET[1]:
-                    if welding_reset_flag[1] and 'reset_step_2' not in welding_reset_imgs:
-                        logging.info("main switch is not reset")
-                        save_image(welding_reset_imgs,results, "reset_step_2")
-                    if welding_reset_flag[0] and 'reset_step_1' not in welding_reset_imgs:
-                        logging.info("oil tank is not reset")
-                        save_image(welding_reset_imgs,results, "reset_step_1")
-                if model_path == WEIGHTS_WELDING_RESET[2]:
-                    if welding_reset_flag[2] and 'reset_step_3' not in welding_reset_imgs:
-                        logging.info("grounding wire is not reset")
-                        save_image(welding_reset_imgs,results, "reset_step_3")
-                    if welding_reset_flag[3] and 'reset_step_4' not in welding_reset_imgs:
-                        logging.info("weilding componet is not reset")
-                        save_image(welding_reset_imgs,results, "reset_step_4")
+            if model_path == WEIGHTS_WELDING_RESET[1]:
+                if welding_reset_flag[1] and 'reset_step_2' not in welding_reset_imgs:
+                    logging.info("main switch is not reset")
+                    save_image(welding_reset_imgs,results, "reset_step_2")
+                    
+                if welding_reset_flag[0] and 'reset_step_1' not in welding_reset_imgs:
+                    logging.info("oil tank is not reset")
+                    save_image(welding_reset_imgs,results, "reset_step_1")
+
+            if model_path == WEIGHTS_WELDING_RESET[2]:
+                if welding_reset_flag[2] and 'reset_step_3' not in welding_reset_imgs:
+                    logging.info("grounding wire is not reset")
+                    save_image(welding_reset_imgs,results, "reset_step_3")
+                if welding_reset_flag[3] and 'reset_step_4' not in welding_reset_imgs:
+                    logging.info("weilding componet is not reset")
+                    save_image(welding_reset_imgs,results, "reset_step_4")
 
 
 

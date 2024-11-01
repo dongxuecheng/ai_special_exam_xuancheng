@@ -1,6 +1,6 @@
 import numpy as np
 
-SERVER_IP='192.168.10.109'
+SERVER_IP='127.0.0.1'
 SERVER_PORT_WELDING_K2 = '5002'  # 焊接k2服务器端口
 
 SAVE_IMG_PATH_WELDING_K2 = 'images/welding/k2'  # 焊接图片保存在服务器的实际位置

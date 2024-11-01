@@ -3,7 +3,7 @@ import torch
 
 from datetime import datetime
 from ultralytics import YOLO
-from utils import IoU_polygon
+from utils import IoU_polygon,IoU
 from config import SAVE_IMG_PATH_WELDING_K2,URL_IMG_PATH_WELDING_K2,WEIGHTS_WELDING_EXAM,VIDEOS_WELDING,WELDING_REGION1,WELDING_REGION2
 import logging
 from uvicorn.config import LOGGING_CONFIG
@@ -40,7 +40,7 @@ def save_image(welding_exam_imgs,results, step_name,welding_exam_order):
     cv2.imwrite(img_path, annotated_frame)
     welding_exam_imgs[step_name]=url_path
     welding_exam_order.append(step_name)
-    print(f"{step_name}完成")
+    logging.info(f"{step_name}完成")
 
 # Function to process video with YOLO model
 def process_video(model_path, video_source,start_event,stop_event,welding_exam_flag, welding_exam_imgs,welding_exam_order):
@@ -48,7 +48,7 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
     model = YOLO(model_path)   
     while True:       
         if stop_event.is_set():
-            print("复位子线程关闭")
+            logging.info(f"{model_path} welding exam detection process is closing🛬")
             break
 
         if video_source.empty():
@@ -68,6 +68,16 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
                 boxes = r.boxes.xyxy  
                 confidences = r.boxes.conf  
                 classes = r.boxes.cls  
+
+                if model_path==WEIGHTS_WELDING_EXAM[1]:
+                    welding_exam_flag[0]=True#油桶每次都要检测，初始化为True
+                if model_path==WEIGHTS_WELDING_EXAM[2]:
+                    grounding_wire_flag=False#搭铁线每次都要检测，初始化为False
+                    welding_components_flag=False#焊件每次都要检测，初始化为False
+                    #实时获取焊件和锤子的位置
+                    welding_components_box=[0,0,0,0]
+                    hamer_box=[0,0,0,0]
+
                 for i in range(len(boxes)):
                     cls = int(classes[i].item())
                     label = model.names[cls]
@@ -76,10 +86,11 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
                             welding_exam_flag[4] = True
                         if label=="machine_close" and welding_exam_flag[4]:#当打开过焊机开关，才能检测关闭状态
                             welding_exam_flag[8] = True
+
                     if model_path==WEIGHTS_WELDING_EXAM[1]:
-                        oil_tank_flag=True
+
                         if label=="oil_tank":#检测油桶
-                            oil_tank_flag=False#当检测到油桶时，说明危险源没有排除，所以为False
+                            welding_exam_flag[0]=False
                         if label=="gloves":
                             welding_exam_flag[7]=True
                         if label=="main_switch_open":
@@ -87,26 +98,22 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
                         if label=="main_switch_close" and welding_exam_flag[1]:
                             welding_exam_flag[12]=True
 
-                        if not welding_exam_flag[0] and oil_tank_flag:
-                            welding_exam_flag[0]=True
 
                     if model_path==WEIGHTS_WELDING_EXAM[2]:
-                        grounding_wire_flag=False#搭铁线每次都要检测，初始化为False
-                        welding_components_flag=False#焊件每次都要检测，初始化为False
-                        
+                       
                         if label=="grounding_wire":
                             if IoU_polygon(boxes[i].tolist(), polygon_points=WELDING_REGION1.tolist())>0.1:
                                 grounding_wire_flag=True
-                            else:
-                                grounding_wire_flag=False
+
                         if label=="welding_components":
                             if IoU_polygon(boxes[i].tolist(), polygon_points=WELDING_REGION2.tolist())>0.1:
-                                #welding_exam_flag[3]=True
                                 welding_components_flag=True
+                                welding_components_box=boxes[i].tolist()
+
                         if label=="mask":
                             welding_exam_flag[5]=True
                         if label=="hamer":
-                            welding_exam_flag[11]=True
+                            hamer_box=boxes[i].tolist()
 
                         if not welding_exam_flag[2] and grounding_wire_flag:
                             welding_exam_flag[2]=True#连接搭铁线
@@ -116,6 +123,9 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
                             welding_exam_flag[3]=True#放置焊件
                         if not welding_exam_flag[10] and welding_exam_flag[3] and not welding_components_flag:
                             welding_exam_flag[10]=True#取下焊件
+                        
+                        if IoU(hamer_box,welding_components_box)>0.1:
+                            welding_exam_flag[11]=True#拿起锤子打扫焊件
                         
 
 
@@ -152,7 +162,10 @@ def process_video(model_path, video_source,start_event,stop_event,welding_exam_f
                 if model_path == WEIGHTS_WELDING_EXAM[3]:
                     if welding_exam_flag[6]==True and 'welding_exam_7' not in welding_exam_imgs:
                         save_image(welding_exam_imgs,results,"welding_exam_7",welding_exam_order)            
-            start_event.set()          
+                    #运行到这里表示一个线程检测完毕
+        if not start_event.is_set():
+            start_event.set()
+            logging.info(f"{model_path} welding reset detection process is running🚀")      
 
 
     if torch.cuda.is_available():
