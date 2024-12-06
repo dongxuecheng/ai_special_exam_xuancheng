@@ -49,7 +49,7 @@ SAVE_IMG_PATH_WELDING_K1 = 'images/welding/k1'  # 焊接图片保存在服务器
 URL_IMG_PATH_WELDING_K1 = f'http://{SERVER_IP}:{SERVER_PORT_WELDING_K1}/{SAVE_IMG_PATH_WELDING_K1}'  # 通过端口映射能够访问的位置 焊接考核科目2
 
 RTSP_WELDING_WEARING='rtsp://admin:yaoan1234@192.168.10.221/cam/realmonitor?channel=1&subtype=0'#焊接的穿戴
-WEIGHTS_WELDING_WEARING_HELMET='weights/welding_wearing/welding_wearing_1203.pt'
+WEIGHTS_WELDING_WEARING_HELMET='weights/welding_wearing/welding_wearing_1206.pt'
 WEIGHTS_WELDING_WEARING_HUMAN='weights/welding_wearing/yolo11n.pt'
 
 WEIGHTS_WELDING_WEARING=[
@@ -134,8 +134,9 @@ SAVE_IMG_PATH_BASKET_K2 = 'images/basket/k2'  # 焊接图片保存在服务器�
 URL_IMG_PATH_BASKET_K2 = f'http://{SERVER_IP}:{SERVER_PORT_BASKET_K2}/{SAVE_IMG_PATH_BASKET_K2}'  
 
 ##########吊具############
-RTSP_EQUIPMENT_TOP='rtsp://admin:yaoan1234@192.168.10.216/cam/realmonitor?channel=1&subtype=0'#吊篮顶部视角
-RTSP_EQUIPMENT_FORNT='rtsp://admin:yaoan1234@192.168.10.219/cam/realmonitor?channel=1&subtype=0'#吊篮正面视角
+RTSP_EQUIPMENT_TOP='rtsp://admin:yaoan1234@192.168.10.216/cam/realmonitor?channel=1&subtype=0'#吊具顶部视角
+RTSP_EQUIPMENT_FORNT='rtsp://admin:yaoan1234@192.168.10.219/cam/realmonitor?channel=1&subtype=0'#吊具正面视角
+RTSP_EQUIPMENT_BACK='rtsp://admin:yaoan1234@192.168.10.212/cam/realmonitor?channel=1&subtype=0'#吊具背面视角
 
 VIDEOS_EQUIPMENT=[
     RTSP_EQUIPMENT_TOP,
@@ -189,3 +190,19 @@ EQUIPMENT_SAFETY_ROPE_REGION = np.array([
 EQUIPMENT_CLEANING_OPERATION_REGION=np.array([
 [[1320, 1350], [1130, 1150], [1930, 1100], [2260, 1260]],
 ], np.int32)
+
+##高处穿戴 吊篮/吊具##
+SERVER_PORT_BASKET_EQUIPMENT_K1 = '5003'  # 高处穿戴k1服务器端口
+
+SAVE_IMG_PATH_BASKET_EQUIPMENT_K1 = 'images/basket_equipment_wearing'  # 焊接图片保存在服务器的实际位置
+
+URL_IMG_PATH_BASKET_EQUIPMENT_K1 = f'http://{SERVER_IP}:{SERVER_PORT_BASKET_EQUIPMENT_K1}/{SAVE_IMG_PATH_BASKET_EQUIPMENT_K1}'  # 通过端口映射能够访问的位置 焊接考核科目2
+
+RTSP_BASKET_EQUIPMENT_WEARING='rtsp://admin:yaoan1234@192.168.10.208/cam/realmonitor?channel=1&subtype=0'#高处的穿戴
+WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET='weights/basket_equipment_wearing/welding_wearing_1203.pt'
+WEIGHTS_BASKET_EQUIPMENT_WEARING_HUMAN='weights/basket_equipment_wearing/yolo11n.pt'
+
+WEIGHTS_BASKET_EQUIPMENT_WEARING=[
+    WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET,
+    WEIGHTS_BASKET_EQUIPMENT_WEARING_HUMAN    
+]

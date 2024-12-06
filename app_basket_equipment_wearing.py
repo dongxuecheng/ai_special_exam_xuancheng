@@ -1,8 +1,3 @@
-
-
-# 穿戴检测29号11：15-11：17
-
-
 import numpy as np
 import cv2
 from ultralytics import YOLO
@@ -16,7 +11,7 @@ import multiprocessing as mp
 from multiprocessing import Queue
 
 from utils import IoU
-from config import SAVE_IMG_PATH_WELDING_K1,URL_IMG_PATH_WELDING_K1,WEIGHTS_WELDING_WEARING,RTSP_WELDING_WEARING
+from config import SAVE_IMG_PATH_BASKET_EQUIPMENT_K1,URL_IMG_PATH_BASKET_EQUIPMENT_K1,WEIGHTS_BASKET_EQUIPMENT_WEARING,RTSP_BASKET_EQUIPMENT_WEARING
 import time
 
 
@@ -33,12 +28,12 @@ start_events = []  # 存储每个进程的启动事件
 stop_events = []  # 存储每个进程的停止事件
 
 #mp.Array性能较高，适合大量写入的场景
-welding_wearing_human_in_postion=mp.Value('b', False)  # 用来判断人是否在指定位置
-welding_wearing_items_nums=mp.Array('i', [0] * 3)  # 用来存储穿戴物品的数量
-welding_wearing_detection_img_flag=mp.Value('b', False)  # 用来传递穿戴检测图片的标志，为真时，表示保存图片
+wearing_human_in_postion=mp.Value('b', False)  # 用来判断人是否在指定位置
+wearing_items_nums=mp.Array('i', [0] * 3)  # 用来存储穿戴物品的数量
+wearing_detection_img_flag=mp.Value('b', False)  # 用来传递穿戴检测图片的标志，为真时，表示保存图片
 #mp.Value适合单个值的场景，性能较慢
 manager = mp.Manager()
-welding_wearing_detection_img = manager.dict()  #用于存储检测焊接穿戴图片
+wearing_detection_img = manager.dict()  #用于存储检测焊接穿戴图片
 
 frame_queue_list = [Queue(maxsize=50) for _ in range(2)] 
 
@@ -65,7 +60,7 @@ def fetch_video_stream(rtsp_url, frame_queue_list, start_event, stop_event):  # 
         frame_queue_list[1].put_nowait(frame)
     cap.release()
 
-def infer_yolo(model_path,video_source, start_event, stop_event,welding_wearing_human_in_postion, welding_wearing_items_nums, welding_wearing_detection_img_flag, welding_wearing_detection_img):#YOLO模型推理
+def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in_postion, wearing_items_nums, wearing_detection_img_flag, wearing_detection_img):#YOLO模型推理
     model = YOLO(model_path)
     while True:      
         if stop_event.is_set():
@@ -76,10 +71,10 @@ def infer_yolo(model_path,video_source, start_event, stop_event,welding_wearing_
         frame = video_source.get()
         #results = model.track(frame,verbose=False,conf=0.5,device='0',tracker="bytetrack.yaml")
         #results = model.predict(frame, verbose=False, conf=0.3)
-        if model_path==WEIGHTS_WELDING_WEARING[0]:#yolov8s，专门用来检测人
+        if model_path==WEIGHTS_BASKET_EQUIPMENT_WEARING[0]:#yolov8s，专门用来检测人
             #model.classes = [0]#设置只检测人一个类别
             results = model.predict(frame,conf=0.6,verbose=False,classes=[0])#这里的results是一个生成器
-            welding_wearing_human_in_postion.value=False
+            wearing_human_in_postion.value=False
         else:
             results = model.predict(frame,conf=0.7,verbose=False)
 
@@ -109,30 +104,30 @@ def infer_yolo(model_path,video_source, start_event, stop_event,welding_wearing_
             # if x1 < WEAR_DETECTION_AREA[0] or y1 < WEAR_DETECTION_AREA[1] or x2 > WEAR_DETECTION_AREA[2] or y2 > WEAR_DETECTION_AREA[3]:
             #     continue  # 跳过不在区域内的检测框
             
-            #if model_path==WEIGHTS_WELDING_WEARING[0]:#yolov8s，专门用来检测人
-            if label=="person" and not welding_wearing_human_in_postion.value:
+            #if model_path==WEIGHTS_BASKET_EQUIPMENT_WEARING[0]:#yolov8s，专门用来检测人
+            if label=="person" and not wearing_human_in_postion.value:
                 if IoU([x1,y1,x2,y2],[876, 0, 1923, 1440]) > 0:
-                    welding_wearing_human_in_postion.value=True
+                    wearing_human_in_postion.value=True
                     
             else:
                 if IoU([x1,y1,x2,y2],[876, 0, 1923, 1440]) > 0:
                     wearing_items[label] += 1
 
 
-        if model_path==WEIGHTS_WELDING_WEARING[1]:
+        if model_path==WEIGHTS_BASKET_EQUIPMENT_WEARING[1]:
 
-            if welding_wearing_human_in_postion.value and not welding_wearing_detection_img_flag.value:
-                welding_wearing_items_nums[0] = max(welding_wearing_items_nums[0], wearing_items["helmet"])
-                welding_wearing_items_nums[1] = max(welding_wearing_items_nums[1], wearing_items["gloves"])
-                welding_wearing_items_nums[2] = max(welding_wearing_items_nums[2], wearing_items["shoes"])
+            if wearing_human_in_postion.value and not wearing_detection_img_flag.value:
+                wearing_items_nums[0] = max(wearing_items_nums[0], wearing_items["helmet"])
+                wearing_items_nums[1] = max(wearing_items_nums[1], wearing_items["gloves"])
+                wearing_items_nums[2] = max(wearing_items_nums[2], wearing_items["shoes"])
 
-            if welding_wearing_detection_img_flag.value and 'wearing_img' not in welding_wearing_detection_img:
+            if wearing_detection_img_flag.value and 'wearing_img' not in wearing_detection_img:
                 save_time=datetime.now().strftime('%Y%m%d_%H%M')
-                imgp_ath = f"{SAVE_IMG_PATH_WELDING_K1}/welding_wearing_detection_{save_time}.jpg"
-                post_path= f"{URL_IMG_PATH_WELDING_K1}/welding_wearing_detection_{save_time}.jpg"
+                imgp_ath = f"{SAVE_IMG_PATH_BASKET_EQUIPMENT_K1}/wearing_detection_{save_time}.jpg"
+                post_path= f"{URL_IMG_PATH_BASKET_EQUIPMENT_K1}/wearing_detection_{save_time}.jpg"
                 annotated_frame = results[0].plot()
                 cv2.imwrite(imgp_ath, annotated_frame)
-                welding_wearing_detection_img['wearing_img']=post_path
+                wearing_detection_img['wearing_img']=post_path
             
 
 
@@ -155,11 +150,11 @@ def reset_shared_variables():
             logging.info("frame_queue_list is empty")
 
 def init_exam_variables():
-    for i in range(len(welding_wearing_items_nums)):
-        welding_wearing_items_nums[i] = False    
-    welding_wearing_human_in_postion.value = False
-    welding_wearing_detection_img_flag.value = False
-    welding_wearing_detection_img.clear()
+    for i in range(len(wearing_items_nums)):
+        wearing_items_nums[i] = False    
+    wearing_human_in_postion.value = False
+    wearing_detection_img_flag.value = False
+    wearing_detection_img.clear()
 
 
 
@@ -169,16 +164,16 @@ def wearing_detection():
         #for video_source in VIDEOS_EQUIPMENT:
         start_event = mp.Event()  # 为每个进程创建一个独立的事件
         stop_event=mp.Event()
-        process = mp.Process(target=fetch_video_stream, args=(RTSP_WELDING_WEARING,frame_queue_list, start_event, stop_event))
+        process = mp.Process(target=fetch_video_stream, args=(RTSP_BASKET_EQUIPMENT_WEARING,frame_queue_list, start_event, stop_event))
         stop_events.append(stop_event)
         start_events.append(start_event)  # 加入 start_events 列表，因为start_events是列表，append或clear不需要加global
         processes.append(process)
         process.start()
 
-        for model_path, video_source in zip(WEIGHTS_WELDING_WEARING, frame_queue_list):
+        for model_path, video_source in zip(WEIGHTS_BASKET_EQUIPMENT_WEARING, frame_queue_list):
             start_event = mp.Event()  # 为每个进程创建一个独立的事件
             stop_event=mp.Event()
-            process = mp.Process(target=infer_yolo, args=(model_path,video_source, start_event, stop_event,welding_wearing_human_in_postion, welding_wearing_items_nums, welding_wearing_detection_img_flag, welding_wearing_detection_img))
+            process = mp.Process(target=infer_yolo, args=(model_path,video_source, start_event, stop_event,wearing_human_in_postion, wearing_items_nums, wearing_detection_img_flag, wearing_detection_img))
             start_events.append(start_event)  # 加入 start_events 列表
             stop_events.append(stop_event)
             processes.append(process)
@@ -191,12 +186,12 @@ def wearing_detection():
         #exam_status_flag.value = False#表示没有开始考核
         return {"status": "SUCCESS"}
     else:
-        logging.info("welding_reset_detection——ALREADY_RUNNING")
+        logging.info("reset_detection——ALREADY_RUNNING")
         return {"status": "ALREADY_RUNNING"}
     
 @app.get('/human_postion_status')
 def human_postion_status():#开始登录时，检测是否需要复位，若需要，则发送复位信息，否则开始焊接检测
-    if not welding_wearing_human_in_postion.value:
+    if not wearing_human_in_postion.value:
         logging.info('NOT_IN_POSTION')
         #return jsonify({"status": "NOT_IN_POSTION"}), 200
         return {"status": "NOT_IN_POSTION"}
@@ -209,21 +204,21 @@ def human_postion_status():#开始登录时，检测是否需要复位，若需�
 @app.get('/wearing_status')
 def wearing_status():
 
-    welding_wearing_detection_img_flag.value=True
+    wearing_detection_img_flag.value=True
     time.sleep(1)
-    if 'wearing_img' not in welding_wearing_detection_img or not welding_wearing_human_in_postion.value:
+    if 'wearing_img' not in wearing_detection_img or not wearing_human_in_postion.value:
 
         return {"status": "NONE"}
     else:
 
         wearing_items_list = [ 'helmet', 'gloves', 'shoes']
         json_array = []
-        for num, item in zip(welding_wearing_items_nums, wearing_items_list):
+        for num, item in zip(wearing_items_nums, wearing_items_list):
             json_object = {"name": item, "number": num}
             json_array.append(json_object)
 
         logging.info(json_array)
-        image=welding_wearing_detection_img['wearing_img']
+        image=wearing_detection_img['wearing_img']
         logging.info(image)
 
         return {"status": "SUCCESS","data":json_array,"image":image}

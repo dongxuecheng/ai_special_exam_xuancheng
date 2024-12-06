@@ -282,15 +282,6 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
 
 
 
-
-
-
-
-        
-
-                
-
-
 def reset_shared_variables():
     global frame_queue_list
     exam_status_flag.value = False

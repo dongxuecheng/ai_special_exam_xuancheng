@@ -440,5 +440,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    #uvicorn.run(app, host="192.168.10.109", port=5005)
-    uvicorn.run(app, host="127.0.0.1", port=5005)
+    uvicorn.run(app, host="192.168.10.109", port=5005)
+    #uvicorn.run(app, host="127.0.0.1", port=5005)
