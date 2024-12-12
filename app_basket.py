@@ -283,16 +283,21 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
 
 
 
-            #print(point_in_region([709,1017],BASKET_PLATFORM_REGION))
-            #空载判断逻辑
 
-            if not basket_person_flag and 'basket' in basket_seg_region and not basket_cleaning_flag[7]:
+            #检测人是否在吊篮内
+            # if not basket_person_flag and 'basket' in basket_seg_region and not basket_cleaning_flag[7]:
+            #     #basket_cleaning_flag[7]=True
+            #     if rect_polgyon_iou([446,883,765,1163],basket_seg_region['platform'])>0.01:
+            #         basket_cleaning_flag[7]=True
+            #         logging.info("空载")
+
+            #不检测人是否在吊篮内
+            if 'basket' in basket_seg_region and not basket_cleaning_flag[7]:
                 #basket_cleaning_flag[7]=True
                 if rect_polgyon_iou([446,883,765,1163],basket_seg_region['platform'])>0.01:
                     basket_cleaning_flag[7]=True
-                    print("空载")
-                    #
-                #print("空载"+str(rect_polgyon_iou([446,883,765,1163],basket_seg_region['platform'])))
+                    logging.info("空载")
+
             
 
 
@@ -440,5 +445,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="192.168.10.109", port=5005)
-    #uvicorn.run(app, host="127.0.0.1", port=5005)
+    #uvicorn.run(app, host="192.168.10.109", port=5005)
+    uvicorn.run(app, host="127.0.0.1", port=5005)

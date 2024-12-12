@@ -27,7 +27,7 @@ from multiprocessing import Queue
 from shapely.geometry import box, Polygon
 from utils import IoU
 from config import SAVE_IMG_PATH_EQUIPMENT_K2,URL_IMG_PATH_EQUIPMENT_K2,WEIGHTS_EQUIPMENT,VIDEOS_EQUIPMENT
-from config import EQUIPMENT_CLEANING_OPERATION_REGION,EQUIPMENT_WORK_ROPE_REGION,EQUIPMENT_SAFETY_ROPE_REGION,EQUIPMENT_ANCHOR_DEVICE_REGION,EQUIPMENT_WARNING_ZONE_REGION
+from config import EQUIPMENT_CLEANING_OPERATION_REGION,EQUIPMENT_WORK_ROPE_REGION,EQUIPMENT_SAFETY_ROPE_REGION,EQUIPMENT_ANCHOR_DEVICE_REGION,EQUIPMENT_WARNING_ZONE_REGION_TOP,EQUIPMENT_WARNING_ZONE_REGION_FORNT
 
 
 
@@ -50,8 +50,9 @@ person_position = mp.Array('f', [0.0] * 4)  # 创建一个长度为4的共享数
 manager = mp.Manager()
 equipment_cleaning_order = manager.list()#用于存储各个步骤的顺序
 equipment_cleaning_imgs = manager.dict()  #用于存储各个步骤的图片
-frame_queue_list = [Queue(maxsize=50) for _ in range(4)] 
+frame_queue_list = [Queue(maxsize=50) for _ in range(5)] 
 exam_status_flag = mp.Value('b', False)  # 创建一个共享变量，并初始化为False,用于在多个线程中间传递变量,表示是否开始考核,True表示开始考核
+equipment_cleaning_warning_zone_flag=mp.Array('b', [False] * 2)#存储两个视角下的警戒区域的检测结果
 
 def point_in_region(point, region):#判断点是否在多边形内
     is_inside = cv2.pointPolygonTest(region.reshape((-1, 1, 2)), point, False)
@@ -76,7 +77,7 @@ def save_image(equipment_cleaning_imgs, equipment_cleaning_order,results, step_n
     url_path = f"{URL_IMG_PATH_EQUIPMENT_K2}/{step_name}_{save_time}.jpg"
     annotated_frame = results[0].plot()
     if step_name == "equipment_step_1":
-        annotated_frame = cv2.polylines(annotated_frame, [region.reshape(-1, 1, 2) for region in EQUIPMENT_WARNING_ZONE_REGION], isClosed=True, color=(0, 255, 0), thickness=4)
+        annotated_frame = cv2.polylines(annotated_frame, [region.reshape(-1, 1, 2) for region in EQUIPMENT_WARNING_ZONE_REGION_TOP], isClosed=True, color=(0, 255, 0), thickness=4)
     elif step_name == "equipment_step_2":
         annotated_frame = cv2.polylines(annotated_frame, [region.reshape(-1, 1, 2) for region in EQUIPMENT_ANCHOR_DEVICE_REGION], isClosed=True, color=(0, 255, 0), thickness=4)
     elif step_name == "equipment_step_4":
@@ -94,9 +95,10 @@ def save_image(equipment_cleaning_imgs, equipment_cleaning_order,results, step_n
 def fetch_video_stream(rtsp_url, frame_queue_list, start_event, stop_event):  # 拉取视频流到队列中
     #队列与对应的模型
     #frame_queue_list[0]:吊具顶部视角，检测安全带,刷子，警戒区，自锁器
-    #frame_queue_list[1]:吊具正面视角，检查座板，u型锁
-    #frame_queue_list[2]:吊具顶部人员姿态估计
-    #frame_queue_list[3]:吊具正面，检查人
+    #frame_queue_list[1]:吊具顶部人员姿态估计
+    #frame_queue_list[2]:吊具背面，检查人员是否在挂点装置/实时获取人员位置
+    #frame_queue_list[3]:吊具背面，检查座板
+    #frame_queue_list[4]:吊具正面视角，检查警戒区
     cap = cv2.VideoCapture(rtsp_url)
     index = VIDEOS_EQUIPMENT.index(rtsp_url)
     while cap.isOpened():
@@ -111,11 +113,17 @@ def fetch_video_stream(rtsp_url, frame_queue_list, start_event, stop_event):  # 
         if not start_event.is_set():
             start_event.set()
             logging.info(f'fetch_video_stream{rtsp_url}')
-        frame_queue_list[index].put_nowait(frame)
-        frame_queue_list[index+2].put_nowait(frame)#（0，2）（1，3）用同一个视频流
+        if index==0:
+            frame_queue_list[0].put_nowait(frame)
+            frame_queue_list[1].put_nowait(frame)
+        elif index==1:
+            frame_queue_list[2].put_nowait(frame)
+            frame_queue_list[3].put_nowait(frame)
+        elif index==2:
+            frame_queue_list[4].put_nowait(frame)
     cap.release()
 
-def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleaning_flag,equipment_cleaning_imgs,equipment_cleaning_order,person_position):#YOLO模型推理
+def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleaning_flag,equipment_cleaning_imgs,equipment_cleaning_order,person_position,equipment_cleaning_warning_zone_flag):#YOLO模型推理
     model = YOLO(model_path)
     while True:      
         if stop_event.is_set():
@@ -138,7 +146,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
             classes = results[0].boxes.cls 
             safety_belt_position=[0,0,0,0]
             self_locking_position=[0,0,0,0]
-            Warning_zone_flag=False 
+            equipment_cleaning_warning_zone_flag[1]=False
             brush_flag=False
             for i in range(len(boxes)):
                 x1, y1, x2, y2 = boxes[i].tolist()
@@ -155,13 +163,14 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                         equipment_cleaning_flag[9]=True
 
                 elif label=='warning_zone' and confidence>0.7:
+                    
                     centerx=(x1+x2)/2
                     centery=(y1+y2)/2
-                    point_in_region_flag=point_in_region([centerx,centery],EQUIPMENT_WARNING_ZONE_REGION)#警戒区划分区域
+                    point_in_region_flag=point_in_region([centerx,centery],EQUIPMENT_WARNING_ZONE_REGION_TOP)#警戒区划分区域
                     if point_in_region_flag:
-                        Warning_zone_flag=True
                         equipment_cleaning_flag[0]=True
-                    #equipment_warning_zone_flag[1]=True
+                        equipment_cleaning_warning_zone_flag[1]=True
+                        
                     #equipment_cleaning_flag[0]=True
                 elif label=='safety_belt':
                     safety_belt_position=[x1,y1,x2,y2]
@@ -172,13 +181,17 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
             if IoU(safety_belt_position,self_locking_position)>0:
                 equipment_cleaning_flag[8]=True
                 #print("安全带挂设完毕")
-            if equipment_cleaning_flag[0] and not Warning_zone_flag:
+
+            if not equipment_cleaning_warning_zone_flag[0] and not equipment_cleaning_warning_zone_flag[1] and equipment_cleaning_flag[0] and equipment_cleaning_flag[9]:#当检测不到警戒区时,且完成第九步清洗现场时，判定为拆除警戒区域
                 equipment_cleaning_flag[11]=True
+                print("拆除警戒区域-----------")
+
+
 
             if equipment_cleaning_flag[11] and not brush_flag:
                     equipment_cleaning_flag[10]=True
 
-        elif model_path==WEIGHTS_EQUIPMENT[2]:#D6,pose
+        elif model_path==WEIGHTS_EQUIPMENT[1]:#D6,pose
             boxes=results[0].boxes.xyxy#人体的检测框
             keypoints = results[0].keypoints.xy  
             confidences = results[0].keypoints.conf  
@@ -203,9 +216,9 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                 # if not equipment_cleaning_flag[5]:#TODO 暂时不用
                 #     is_inside = any(point_in_region(point, EQUIPMENT_SELF_LOCKING_DEVICE_REGION) for point in points)
                 #     if is_inside:
-                #         equipment_cleaning_flag[5]=True
+                #         equipment_cleaning_flag[5]=True        
 
-        elif model_path==WEIGHTS_EQUIPMENT[3]:#D3 detect
+        elif model_path==WEIGHTS_EQUIPMENT[2]:#D3 detect
             boxes = results[0].boxes.xyxy  
             confidences = results[0].boxes.conf 
             classes = results[0].boxes.cls  
@@ -229,7 +242,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                     if point_in_region_flag and not equipment_cleaning_flag[1]:
                         equipment_cleaning_flag[1]=True
                     
-        elif model_path==WEIGHTS_EQUIPMENT[1]:#D3 detect
+        elif model_path==WEIGHTS_EQUIPMENT[3]:#D3 detect
             boxes = results[0].boxes.xyxy  
             confidences = results[0].boxes.conf 
             classes = results[0].boxes.cls  
@@ -240,16 +253,40 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                 cls = int(classes[i].item())
                 label = model.names[cls]
 
-
                 if label=='seating_plate':
                     if(IoU(person_position,[x1,y1,x2,y2])>0.3):            
                         equipment_cleaning_flag[2]=True
-                    if (x1 >= 1248 and y1 >= 223 and x2 <= 1625 and y2 <= 1026):
+                    #if (x1 >= 1248 and y1 >= 223 and x2 <= 1625 and y2 <= 1026):
                         equipment_cleaning_flag[7]=True
 
                 elif label=='u_lock':
                     equipment_cleaning_flag[6]=True
                     #print("u型锁")
+
+        elif model_path==WEIGHTS_EQUIPMENT[4]:#D5,detect
+            boxes = results[0].boxes.xyxy  
+            confidences = results[0].boxes.conf 
+            classes = results[0].boxes.cls  
+            equipment_cleaning_warning_zone_flag[0]=False
+            for i in range(len(boxes)):
+                x1, y1, x2, y2 = boxes[i].tolist()
+                confidence = confidences[i].item()
+                cls = int(classes[i].item())
+                label = model.names[cls]
+
+                if label=='warning_zone':#正面视角，仅仅检测视频流    
+                    #equipment_cleaning_flag[0]=True
+                    centerx=(x1+x2)/2
+                    centery=(y1+y2)/2
+                    point_in_region_flag=point_in_region([centerx,centery],EQUIPMENT_WARNING_ZONE_REGION_FORNT)#警戒区划分区域
+                    if point_in_region_flag:
+                        equipment_cleaning_flag[0]=True
+                        equipment_cleaning_warning_zone_flag[0]=True
+
+
+
+
+
         
         exam_steps = {
             WEIGHTS_EQUIPMENT[0]: [
@@ -257,19 +294,19 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
             (equipment_cleaning_flag[8], 'equipment_step_9'),
             (equipment_cleaning_flag[9], 'equipment_step_10'),
             (equipment_cleaning_flag[11], 'equipment_step_12'),
-            (equipment_cleaning_flag[10] and equipment_cleaning_flag[11] and equipment_cleaning_flag[9], 'equipment_step_11')
+            (equipment_cleaning_flag[10], 'equipment_step_11')
             ],
-            WEIGHTS_EQUIPMENT[1]: [
+            WEIGHTS_EQUIPMENT[3]: [
             (equipment_cleaning_flag[2], 'equipment_step_3'),
             (equipment_cleaning_flag[7], 'equipment_step_8'),
             (equipment_cleaning_flag[6], 'equipment_step_7')
             ],
-            WEIGHTS_EQUIPMENT[2]: [
+            WEIGHTS_EQUIPMENT[1]: [
             (equipment_cleaning_flag[3], 'equipment_step_4'),
             (equipment_cleaning_flag[4], 'equipment_step_5'),
             (equipment_cleaning_flag[5], 'equipment_step_6')
             ],
-            WEIGHTS_EQUIPMENT[3]: [
+            WEIGHTS_EQUIPMENT[2]: [
             (equipment_cleaning_flag[1], 'equipment_step_2')
             ]
         }
@@ -302,6 +339,10 @@ def init_exam_variables():
     person_position[2] = 0.0
     person_position[3] = 0.0
 
+    equipment_cleaning_warning_zone_flag[0]=False
+    equipment_cleaning_warning_zone_flag[1]=False
+
+
 
 @app.get('/start_detection')
 def start_detection():
@@ -318,7 +359,7 @@ def start_detection():
         for model_path, video_source in zip(WEIGHTS_EQUIPMENT, frame_queue_list):
             start_event = mp.Event()  # 为每个进程创建一个独立的事件
             stop_event=mp.Event()
-            process = mp.Process(target=infer_yolo, args=(model_path,video_source, start_event, stop_event,equipment_cleaning_flag,equipment_cleaning_imgs,equipment_cleaning_order,person_position))
+            process = mp.Process(target=infer_yolo, args=(model_path,video_source, start_event, stop_event,equipment_cleaning_flag,equipment_cleaning_imgs,equipment_cleaning_order,person_position,equipment_cleaning_warning_zone_flag))
             start_events.append(start_event)  # 加入 start_events 列表
             stop_events.append(stop_event)
             processes.append(process)
@@ -398,5 +439,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="192.168.10.109", port=5006)
-    #uvicorn.run(app, host="127.0.0.1", port=5006)
+    #uvicorn.run(app, host="192.168.10.109", port=5006)
+    uvicorn.run(app, host="127.0.0.1", port=5006)
