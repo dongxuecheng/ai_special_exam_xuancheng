@@ -29,7 +29,7 @@ stop_events = []  # 存储每个进程的停止事件
 
 #mp.Array性能较高，适合大量写入的场景
 wearing_human_in_postion=mp.Value('b', False)  # 用来判断人是否在指定位置
-wearing_items_nums=mp.Array('i', [0] * 3)  # 用来存储穿戴物品的数量
+wearing_items_nums=mp.Array('i', [0] * 2)  # 用来存储穿戴物品的数量
 wearing_detection_img_flag=mp.Value('b', False)  # 用来传递穿戴检测图片的标志，为真时，表示保存图片
 #mp.Value适合单个值的场景，性能较慢
 manager = mp.Manager()
@@ -89,9 +89,8 @@ def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in
         classes = results[0].boxes.cls  # 提取所有检测到的类别索引
         ###劳保,不在函数外部定义是因为需要每一帧重新赋值
         wearing_items={
-                'helmet': 0,
-                'gloves': 0,
-                'shoes': 0
+                'belt': 0,
+                'helemt': 0
         }
             
         for i in range(len(boxes)):
@@ -117,9 +116,8 @@ def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in
         if model_path==WEIGHTS_BASKET_EQUIPMENT_WEARING[1]:
 
             if wearing_human_in_postion.value and not wearing_detection_img_flag.value:
-                wearing_items_nums[0] = max(wearing_items_nums[0], wearing_items["helmet"])
-                wearing_items_nums[1] = max(wearing_items_nums[1], wearing_items["gloves"])
-                wearing_items_nums[2] = max(wearing_items_nums[2], wearing_items["shoes"])
+                wearing_items_nums[0] = max(wearing_items_nums[0], wearing_items["belt"])
+                wearing_items_nums[1] = max(wearing_items_nums[1], wearing_items["helemt"])
 
             if wearing_detection_img_flag.value and 'wearing_img' not in wearing_detection_img:
                 save_time=datetime.now().strftime('%Y%m%d_%H%M')
@@ -137,8 +135,6 @@ def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in
 
 
         
-
-                
 
 
 def reset_shared_variables():
@@ -263,5 +259,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="192.168.10.109", port=5001)
-    #uvicorn.run(app, host="127.0.0.1", port=5001)
+    #uvicorn.run(app, host="192.168.10.109", port=5003)
+    uvicorn.run(app, host="127.0.0.1", port=5003)

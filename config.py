@@ -199,10 +199,11 @@ SAVE_IMG_PATH_BASKET_EQUIPMENT_K1 = 'images/basket_equipment_wearing'  # 焊接�
 URL_IMG_PATH_BASKET_EQUIPMENT_K1 = f'http://{SERVER_IP}:{SERVER_PORT_BASKET_EQUIPMENT_K1}/{SAVE_IMG_PATH_BASKET_EQUIPMENT_K1}'  # 通过端口映射能够访问的位置 焊接考核科目2
 
 RTSP_BASKET_EQUIPMENT_WEARING='rtsp://admin:yaoan1234@192.168.10.208/cam/realmonitor?channel=1&subtype=0'#高处的穿戴
-WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET='weights/basket_equipment_wearing/welding_wearing_1203.pt'
+WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET='weights/basket_equipment_wearing/basket_equipment_wearing.pt'
 WEIGHTS_BASKET_EQUIPMENT_WEARING_HUMAN='weights/basket_equipment_wearing/yolo11n.pt'
 
 WEIGHTS_BASKET_EQUIPMENT_WEARING=[
-    WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET,
-    WEIGHTS_BASKET_EQUIPMENT_WEARING_HUMAN    
+    WEIGHTS_BASKET_EQUIPMENT_WEARING_HUMAN,   
+    WEIGHTS_BASKET_EQUIPMENT_WEARING_HELMET
+     
 ]
