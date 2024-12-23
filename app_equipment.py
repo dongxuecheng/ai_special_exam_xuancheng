@@ -10,7 +10,6 @@
 
 #6 stop_exam #停止焊接考核
 
-# 穿戴检测29号11：15-11：17
 
 
 import numpy as np
@@ -133,7 +132,10 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
             continue
         frame = video_source.get()
         #results = model.track(frame,verbose=False,conf=0.5,device='0',tracker="bytetrack.yaml")
-        results = model.predict(frame, verbose=False, conf=0.3)
+        if model_path==WEIGHTS_EQUIPMENT[2]:
+            results = model.predict(frame, verbose=False, conf=0.3,classes=[0])
+        else:
+            results = model.predict(frame, verbose=False, conf=0.3)
         
         if not start_event.is_set():
             start_event.set()
@@ -162,7 +164,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                     if is_inside:
                         equipment_cleaning_flag[9]=True
 
-                elif label=='warning_zone' and confidence>0.7:
+                elif label=='warning_zone' and confidence>0.5:
                     
                     centerx=(x1+x2)/2
                     centery=(y1+y2)/2
@@ -178,7 +180,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                 elif label=='self_lock':
                     self_locking_position=[x1,y1,x2,y2]
                 
-            if IoU(safety_belt_position,self_locking_position)>0:
+            if IoU(safety_belt_position,self_locking_position)>0 and equipment_cleaning_flag[7]:
                 equipment_cleaning_flag[8]=True
                 #print("安全带挂设完毕")
 
@@ -228,7 +230,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                 cls = int(classes[i].item())
                 label = model.names[cls]
 
-                if label=='person':
+                if label=='person' and confidence>0.8:
                     #person_position=[x1,y1,x2,y2]
                     person_position[0]=x1
                     person_position[1]=y1
@@ -254,10 +256,11 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                 label = model.names[cls]
 
                 if label=='seating_plate':
-                    if(IoU(person_position,[x1,y1,x2,y2])>0.3):            
+                    if(IoU(person_position,[x1,y1,x2,y2])>0):            
                         equipment_cleaning_flag[2]=True
                     #if (x1 >= 1248 and y1 >= 223 and x2 <= 1625 and y2 <= 1026):
-                        equipment_cleaning_flag[7]=True
+                        if equipment_cleaning_flag[6]:
+                            equipment_cleaning_flag[7]=True
 
                 elif label=='u_lock':
                     equipment_cleaning_flag[6]=True
@@ -282,8 +285,6 @@ def infer_yolo(model_path,video_source, start_event, stop_event,equipment_cleani
                     if point_in_region_flag:
                         equipment_cleaning_flag[0]=True
                         equipment_cleaning_warning_zone_flag[0]=True
-
-
 
 
 
@@ -439,5 +440,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    #uvicorn.run(app, host="192.168.10.109", port=5006)
-    uvicorn.run(app, host="127.0.0.1", port=5006)
+    uvicorn.run(app, host="192.168.10.109", port=5006)
+    #uvicorn.run(app, host="127.0.0.1", port=5006)

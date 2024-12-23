@@ -184,7 +184,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
                 cls = int(classes[i].item())
                 label = model.names[cls]
 
-                if label=='brush':
+                if label=='brush' and confidence>0.7:
                     brush_flag=True
                     is_inside = point_in_region([(x1+x2)/2,(y1+y2)/2],BASKET_CLEANING_OPERATION_REGION)
                     if is_inside:
@@ -193,12 +193,13 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
                     #print("刷子")
 
                 elif label=='warning_zone':
-                    basket_cleaning_warning_zone_flag[1]=True
+                    
                     centerx=(x1+x2)/2
                     centery=(y1+y2)/2
                     point_in_region_flag=point_in_region([centerx,centery],BASKET_WARNING_ZONE_REGION_TOP)#警戒区划分区域
                     if point_in_region_flag:
                         basket_cleaning_flag[0]=True
+                        basket_cleaning_warning_zone_flag[1]=True
                 
                 elif label=='safety_belt':
                     safety_belt_position=[x1,y1,x2,y2]
@@ -219,9 +220,14 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
 
         elif model_path==WEIGHTS_BASKET[3]:#d6分割
             boxes = results[0].boxes.xyxy
-            masks = results[0].masks.xy
+            if results[0].masks is not None:
+                masks = results[0].masks.xy
+            else:
+                masks = [] 
             classes = results[0].boxes.cls 
             confidences = results[0].boxes.conf 
+            if basket_cleaning_flag[7]:#如果分割结束，后面就不进行检测 
+                continue
             for i in range(len(boxes)):
                 x1, y1, x2, y2 = boxes[i].tolist()
                 confidence = confidences[i].item()
@@ -235,7 +241,13 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
                     basket_seg_region["hoist_r"]=np.array(masks[i].tolist(),np.int32)
                 elif label=="electricalSystem":
                     basket_seg_region["electricalSystem"]=np.array(masks[i].tolist(), np.int32)
-
+            
+            if 'platform' in basket_seg_region and not basket_cleaning_flag[7]:
+                #basket_cleaning_flag[7]=True
+                #ogging.info('----')
+                if rect_polgyon_iou([573,431,923,820],basket_seg_region['platform'])>0:
+                    basket_cleaning_flag[7]=True
+                    logging.info("空载")
 
         elif model_path==WEIGHTS_BASKET[4]:#D6,pose
             boxes=results[0].boxes.xyxy#人体的检测框
@@ -292,11 +304,11 @@ def infer_yolo(model_path,video_source, start_event, stop_event,basket_cleaning_
             #         logging.info("空载")
 
             #不检测人是否在吊篮内
-            if 'basket' in basket_seg_region and not basket_cleaning_flag[7]:
-                #basket_cleaning_flag[7]=True
-                if rect_polgyon_iou([446,883,765,1163],basket_seg_region['platform'])>0.01:
-                    basket_cleaning_flag[7]=True
-                    logging.info("空载")
+            # if 'platform' in basket_seg_region and not basket_cleaning_flag[7]:
+            #     #basket_cleaning_flag[7]=True
+            #     if rect_polgyon_iou([446,883,765,1163],basket_seg_region['platform'])>0:
+            #         basket_cleaning_flag[7]=True
+            #         logging.info("空载")
 
             
 
@@ -445,5 +457,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    #uvicorn.run(app, host="192.168.10.109", port=5005)
-    uvicorn.run(app, host="127.0.0.1", port=5005)
+    uvicorn.run(app, host="192.168.10.109", port=5005)
+    #uvicorn.run(app, host="127.0.0.1", port=5005)

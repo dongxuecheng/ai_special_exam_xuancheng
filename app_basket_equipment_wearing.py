@@ -104,7 +104,7 @@ def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in
             #     continue  # 跳过不在区域内的检测框
             
             #if model_path==WEIGHTS_BASKET_EQUIPMENT_WEARING[0]:#yolov8s，专门用来检测人
-            if label=="person" and not wearing_human_in_postion.value:
+            if label=="person":
                 if IoU([x1,y1,x2,y2],[876, 0, 1923, 1440]) > 0:
                     wearing_human_in_postion.value=True
                     
@@ -133,8 +133,6 @@ def infer_yolo(model_path,video_source, start_event, stop_event,wearing_human_in
 
 
 
-
-        
 
 
 def reset_shared_variables():
@@ -207,7 +205,7 @@ def wearing_status():
         return {"status": "NONE"}
     else:
 
-        wearing_items_list = [ 'helmet', 'gloves', 'shoes']
+        wearing_items_list = [ 'helmet', 'belt']
         json_array = []
         for num, item in zip(wearing_items_nums, wearing_items_list):
             json_object = {"name": item, "number": num}
@@ -259,5 +257,5 @@ def stop_detection():
         return {"status": "No_detection_running"}
 
 if __name__ == "__main__":
-    #uvicorn.run(app, host="192.168.10.109", port=5003)
-    uvicorn.run(app, host="127.0.0.1", port=5003)
+    uvicorn.run(app, host="192.168.10.109", port=5003)
+    #uvicorn.run(app, host="127.0.0.1", port=5003)

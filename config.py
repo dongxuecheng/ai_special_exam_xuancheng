@@ -140,8 +140,9 @@ RTSP_EQUIPMENT_BACK='rtsp://admin:yaoan1234@192.168.10.212/cam/realmonitor?chann
 
 VIDEOS_EQUIPMENT=[
     RTSP_EQUIPMENT_TOP,
+    RTSP_EQUIPMENT_BACK,
     RTSP_EQUIPMENT_FORNT,
-    RTSP_EQUIPMENT_BACK
+    
 ]
 
 WEIGHTS_EQUIPMENT_SAFETY_BELT_DETECT='weights/equipment/1127/equipment_safety_belt_1127.pt'

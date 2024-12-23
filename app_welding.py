@@ -112,15 +112,15 @@ def infer_yolo(model_path, video_source, start_event, stop_event,welding_reset_f
                 cls = int(classes[i].item())
                 label = model.names[cls]
                 if model_path==WEIGHTS_WELDING[0]:
-                    if label=="broom":
+                    if label=="broom" and welding_exam_flag[6]:#检测到扫把
                         welding_exam_flag[13]=True
 
                 if model_path==WEIGHTS_WELDING[1]:
-                    if label== "machine_open":#检测焊机开关
+                    if label== "machine_open" and confidences>0.7:#检测焊机开关
                         welding_exam_flag[4] = True
                         welding_reset_flag[4] = True
 
-                    if label=="machine_close" and welding_exam_flag[4]:#当打开过焊机开关，才能检测关闭状态
+                    if label=="machine_close" and confidences>0.7 and welding_exam_flag[4]:#当打开过焊机开关，才能检测关闭状态
                         welding_exam_flag[8] = True
                         welding_reset_flag[4] = False
 
@@ -173,7 +173,7 @@ def infer_yolo(model_path, video_source, start_event, stop_event,welding_reset_f
                     if not grounding_wire_flag and welding_exam_flag[2] and welding_exam_flag[6]:
                         welding_exam_flag[9]=True
                         #logging.info("没有检测到搭铁线")
-                    if not welding_components_flag and welding_exam_flag[3] and welding_exam_flag[6]:
+                    if not welding_components_flag and welding_exam_flag[3] and welding_exam_flag[6] and welding_exam_flag[11]:
                         #logging.info("没有检测到焊件")
                         welding_exam_flag[10]=True
 
